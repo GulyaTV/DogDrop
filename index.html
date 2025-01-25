@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DogDrop</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-label {
+            background-color: #6200ea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .file-label:hover {
+            background-color: #3700b3;
+        }
+        button {
+            background-color: #03dac6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #018786;
+        }
+        #deviceList {
+            list-style-type: none;
+            padding: 0;
+            width: 100%;
+            max-width: 400px;
+        }
+        #deviceList li {
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>DogDrop</h1>
+    <label for="fileInput" class="file-label">Выберите файл</label>
+    <input type="file" id="fileInput">
+    <button onclick="sendFile()">Отправить файл</button>
+    <button onclick="detectDevices()">Найти устройства</button>
+    <ul id="deviceList"></ul>
+
+    <script>
+        let serverIP = null;
+
+        async function detectDevices() {
+            const deviceList = document.getElementById('deviceList');
+            deviceList.innerHTML = '';
+
+            // Отправляем широковещательное сообщение
+            const udpSocket = new WebSocket('ws://localhost:12346');
+            udpSocket.onmessage = function (e) {
+                if (e.data === "DOG_RESPONSE") {
+                    const li = document.createElement('li');
+                    li.textContent = `Устройство найдено: ${e.origin}`;
+                    deviceList.appendChild(li);
+                    serverIP = e.origin;
+                }
+            };
+        }
+
+        async function sendFile() {
+            if (!serverIP) {
+                alert("Сначала найдите устройство!");
+                return;
+            }
+
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Выберите файл!");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                const arrayBuffer = e.target.result;
+                const fileName = file.name;
+
+                const response = await fetch(`http://${serverIP}:12345`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                        'File-Name': fileName
+                    },
+                    body: arrayBuffer
+                });
+
+                if (response.ok) {
+                    alert("Файл успешно отправлен!");
+                } else {
+                    alert("Ошибка при отправке файла.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
