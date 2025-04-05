@@ -1,251 +1,385 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DogDrop - File Transfer</title>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/instascan/1.0.0/instascan.min.js"></script>
+    <title>DogDrop - Quantum File Transfer</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
     <style>
-        /* Previous styles remain, adding new ones below */
-        .mode-selector {
-            margin: 20px 0;
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f8ff;
+        }
+
+        .tabs {
             display: flex;
-            gap: 10px;
+            margin-bottom: 20px;
         }
-        
-        .mode-tab {
+
+        .tab {
             padding: 10px 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
             cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 5px 5px 0 0;
+            background: #fff;
         }
-        
-        .mode-tab.active {
-            background-color: #4CAF50;
+
+        .tab.active {
+            background: #4CAF50;
             color: white;
         }
-        
-        .qrcode-container {
+
+        .panel {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 0 5px 5px 5px;
+            background: white;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .qr-container {
             margin: 20px 0;
             text-align: center;
         }
-        
-        #qrScanner {
-            width: 100%;
-            max-width: 400px;
+
+        #qrVideo {
+            width: 300px;
             height: 300px;
-            border: 2px solid #666;
-            margin: 10px 0;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
         }
-        
-        .bluetooth-status {
+
+        .file-input {
+            margin: 20px 0;
+            padding: 10px;
+            border: 2px dashed #4CAF50;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .status {
             padding: 10px;
             margin: 10px 0;
             border-radius: 5px;
         }
-        
-        .bluetooth-connected {
-            background-color: #dff0d8;
-            border: 1px solid #d6e9c6;
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #45a049;
         }
     </style>
 </head>
 <body>
-    <h1>🐾 DogDrop - File Transfer</h1>
+    <h1>🐶 DogDrop - Quantum File Transfer</h1>
     
-    <div class="mode-selector">
-        <div class="mode-tab active" onclick="switchMode('barkcode')">BarkCode (QR)</div>
-        <div class="mode-tab" onclick="switchMode('taillink')">TailLink (Bluetooth)</div>
-        <div class="mode-tab" onclick="switchMode('manual')">Manual Setup</div>
+    <div class="tabs">
+        <div class="tab active" onclick="showPanel('qrMode')">QR Transfer</div>
+        <div class="tab" onclick="showPanel('airMode')">BarkNet (Air Mode)</div>
     </div>
 
-    <!-- BarkCode (QR) Section -->
-    <div id="barkcodeMode" class="mode-content">
-        <div class="container">
-            <div class="sender">
-                <h2>Sender - Show QR</h2>
-                <div class="qrcode-container" id="qrcode"></div>
+    <!-- QR Mode Panel -->
+    <div id="qrMode" class="panel active">
+        <div class="tabs">
+            <div class="tab active" onclick="showSubPanel('qrSender')">QR Sender</div>
+            <div class="tab" onclick="showSubPanel('qrReceiver')">QR Receiver</div>
+        </div>
+
+        <div id="qrSender" class="panel active">
+            <input type="file" class="file-input" id="qrFileInput">
+            <div class="qr-container" id="qrCodeDisplay"></div>
+            <div class="status" id="qrStatus"></div>
+            <div class="progress-bar">
+                <div class="progress" id="qrProgress"></div>
             </div>
-            
-            <div class="receiver">
-                <h2>Receiver - Scan QR</h2>
-                <video id="qrScanner"></video>
-                <button onclick="startQRScan()">Start Scan</button>
-                <button onclick="stopQRScan()">Stop Scan</button>
+            <button onclick="startQRTransfer()">Start Transfer</button>
+        </div>
+
+        <div id="qrReceiver" class="panel">
+            <video id="qrVideo"></video>
+            <div class="status" id="scanStatus">Scanning QR codes...</div>
+            <div class="progress-bar">
+                <div class="progress" id="scanProgress"></div>
             </div>
+            <button onclick="startScanner()">Start Scanner</button>
         </div>
     </div>
 
-    <!-- TailLink (Bluetooth) Section -->
-    <div id="taillinkMode" class="mode-content" style="display:none;">
-        <div class="container">
-            <div class="sender">
-                <h2>Sender - Advertise</h2>
-                <div class="bluetooth-status" id="bluetoothStatus">
-                    Bluetooth status: Disconnected
-                </div>
-                <button onclick="advertiseViaBluetooth()">Advertise via TailLink</button>
-            </div>
-            
-            <div class="receiver">
-                <h2>Receiver - Connect</h2>
-                <button onclick="connectViaBluetooth()">Scan TailLink Devices</button>
-                <div class="bluetooth-status" id="bluetoothReceiverStatus">
-                    Status: Not connected
-                </div>
-            </div>
+    <!-- Air Mode Panel -->
+    <div id="airMode" class="panel">
+        <div class="tabs">
+            <div class="tab active" onclick="showSubPanel('airSender')">Send Files</div>
+            <div class="tab" onclick="showSubPanel('airReceiver')">Receive Files</div>
         </div>
-    </div>
 
-    <!-- Manual Setup (Original) Section -->
-    <div id="manualMode" class="mode-content" style="display:none;">
-        <!-- Previous manual connection UI remains here -->
+        <div id="airSender" class="panel active">
+            <input type="file" class="file-input" id="airFileInput" multiple>
+            <div class="status" id="airStatus"></div>
+            <div class="progress-bar">
+                <div class="progress" id="airProgress"></div>
+            </div>
+            <button onclick="startBarkNetTransfer()">Send via BarkNet</button>
+        </div>
+
+        <div id="airReceiver" class="panel">
+            <div class="status" id="receiveStatus">Waiting for files...</div>
+            <div class="progress-bar">
+                <div class="progress" id="receiveProgress"></div>
+            </div>
+            <button onclick="discoverDevices()">Discover Devices</button>
+        </div>
     </div>
 
     <script>
-        // Previous WebRTC logic remains, adding new features below
-        
-        let currentMode = 'barkcode';
+        let currentFile = null;
         let qrScanner = null;
-        let bluetoothCharacteristic = null;
+        let airConnection = null;
+        let airDataChannel = null;
+        const CHUNK_SIZE = 2000; // Bytes per QR code
 
-        // Mode switching
-        function switchMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-content').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.mode-tab').forEach(el => el.classList.remove('active'));
-            document.getElementById(mode + 'Mode').style.display = 'block';
-            document.querySelector(`[onclick="switchMode('${mode}')"]`).classList.add('active');
+        // Tab switching
+        function showPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
         }
 
-        // BarkCode QR Implementation
-        function generateQR(content) {
-            QRCode.toCanvas(document.getElementById('qrcode'), content, error => {
-                if (error) console.error('QR generation error:', error);
+        function showSubPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(p => {
+                if (p.parentElement.classList.contains('panel')) p.classList.remove('active')
             });
+            document.getElementById(panelId).classList.add('active');
+            event.target.classList.add('active');
         }
 
-        let scannerInstance = null;
-        function startQRScan() {
-            scannerInstance = new Instascan.Scanner({ video: document.getElementById('qrScanner') });
-            scannerInstance.addListener('scan', content => {
-                try {
-                    const data = JSON.parse(content);
-                    if (data.type === 'offer') handleOffer(data);
-                    if (data.type === 'answer') handleAnswer(data);
-                    stopQRScan();
-                } catch (e) { console.error('Invalid QR data'); }
-            });
-            Instascan.Camera.getCameras().then(cameras => {
-                if (cameras.length > 0) {
-                    scannerInstance.start(cameras[0]);
-                } else {
-                    alert('No cameras found!');
-                }
-            });
-        }
-
-        function stopQRScan() {
-            if (scannerInstance) {
-                scannerInstance.stop();
-                scannerInstance = null;
+        // QR Mode Logic
+        async function startQRTransfer() {
+            const file = document.getElementById('qrFileInput').files[0];
+            if (!file) return alert('Please select a file first!');
+            
+            currentFile = file;
+            const fileBuffer = await file.arrayBuffer();
+            const totalChunks = Math.ceil(fileBuffer.byteLength / CHUNK_SIZE);
+            
+            document.getElementById('qrStatus').textContent = 
+                `Encoding ${formatSize(file.size)} into ${totalChunks} QR codes...`;
+            
+            for (let i = 0; i < totalChunks; i++) {
+                const chunk = fileBuffer.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+                const chunkData = {
+                    index: i,
+                    total: totalChunks,
+                    data: arrayBufferToBase64(chunk),
+                    name: file.name,
+                    type: file.type
+                };
+                
+                QRCode.toCanvas(document.getElementById('qrCodeDisplay'), 
+                    JSON.stringify(chunkData), {
+                        width: 300,
+                        margin: 2
+                    }, () => {
+                        document.getElementById('qrProgress').style.width = 
+                            `${((i + 1) / totalChunks) * 100}%`;
+                    });
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
 
-        // TailLink Bluetooth Implementation
-        const BLUETOOTH_SERVICE_UUID = 'a8b3f524-3a85-4e7f-91ab-8e5a3f6b3a7d';
-        const SDP_CHARACTERISTIC_UUID = 'b42e3c68-ade7-4d85-90c9-0a5f49a1f6a1';
-
-        async function advertiseViaBluetooth() {
-            try {
-                const service = {
-                    uuid: BLUETOOTH_SERVICE_UUID,
-                    characteristics: [
-                        {
-                            uuid: SDP_CHARACTERISTIC_UUID,
-                            properties: ['read', 'write', 'notify'],
-                            descriptors: [{ uuid: '2901', value: 'DogDrop SDP Exchange' }]
+        async function startScanner() {
+            const video = document.getElementById('qrVideo');
+            const status = document.getElementById('scanStatus');
+            let receivedChunks = {};
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.play();
+                    
+                    requestAnimationFrame(tick);
+                    
+                    function tick() {
+                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            canvas.getContext('2d').drawImage(video, 0, 0);
+                            
+                            const code = jsQR(canvas.getImageData(0, 0, canvas.width, canvas.height).data, 
+                                canvas.width, canvas.height);
+                            
+                            if (code) {
+                                const chunkData = JSON.parse(code.data);
+                                receivedChunks[chunkData.index] = chunkData.data;
+                                
+                                const progress = Object.keys(receivedChunks).length / chunkData.total;
+                                document.getElementById('scanProgress').style.width = `${progress * 100}%`;
+                                
+                                if (Object.keys(receivedChunks).length === chunkData.total) {
+                                    assembleFile(chunkData, receivedChunks);
+                                    video.srcObject.getTracks().forEach(track => track.stop());
+                                }
+                            }
                         }
-                    ]
-                };
-
-                const server = await navigator.bluetooth.requestAdvertising({
-                    services: [BLUETOOTH_SERVICE_UUID],
-                    name: 'DogDrop-Sender'
+                        requestAnimationFrame(tick);
+                    }
                 });
-
-                document.getElementById('bluetoothStatus').innerHTML = 
-                    'Advertising via TailLink... Waiting for connection';
-                
-                server.onconnect = async () => {
-                    document.getElementById('bluetoothStatus').innerHTML = 
-                        'Connected via TailLink!';
-                    await setupBluetoothConnection(server);
-                };
-            } catch (error) {
-                console.error('Bluetooth error:', error);
-            }
         }
 
-        async function connectViaBluetooth() {
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [BLUETOOTH_SERVICE_UUID] }],
-                    optionalServices: [BLUETOOTH_SERVICE_UUID]
+        function assembleFile(meta, chunks) {
+            const orderedChunks = [];
+            for (let i = 0; i < meta.total; i++) {
+                orderedChunks.push(base64ToArrayBuffer(chunks[i]));
+            }
+            
+            const file = new Blob(orderedChunks, { type: meta.type });
+            downloadFile(file, meta.name);
+            document.getElementById('scanStatus').textContent = 'File received successfully!';
+        }
+
+        // Air Mode (BarkNet) Logic
+        async function startBarkNetTransfer() {
+            const files = document.getElementById('airFileInput').files;
+            if (!files.length) return alert('Please select files first!');
+            
+            airConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            airDataChannel = airConnection.createDataChannel('barknet');
+            
+            airDataChannel.onopen = () => {
+                Array.from(files).forEach(async (file, index) => {
+                    const buffer = await file.arrayBuffer();
+                    airDataChannel.send(JSON.stringify({
+                        name: file.name,
+                        type: file.type,
+                        size: buffer.byteLength
+                    }));
+                    
+                    for (let offset = 0; offset < buffer.byteLength; offset += CHUNK_SIZE) {
+                        const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
+                        airDataChannel.send(chunk);
+                    }
                 });
-
-                const server = await device.gatt.connect();
-                document.getElementById('bluetoothReceiverStatus').innerHTML = 
-                    'Connected! Setting up...';
-
-                const service = await server.getPrimaryService(BLUETOOTH_SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(SDP_CHARACTERISTIC_UUID);
-                
-                characteristic.addEventListener('characteristicvaluechanged', event => {
-                    const value = new TextDecoder().decode(event.target.value);
-                    handleBluetoothMessage(value);
-                });
-                await characteristic.startNotifications();
-                
-                bluetoothCharacteristic = characteristic;
-                document.getElementById('bluetoothReceiverStatus').innerHTML = 
-                    'TailLink connection established!';
-            } catch (error) {
-                console.error('Bluetooth connection error:', error);
-            }
-        }
-
-        async function handleBluetoothMessage(message) {
-            try {
-                const data = JSON.parse(message);
-                if (data.type === 'offer') {
-                    const answer = await createAnswer(data);
-                    await bluetoothCharacteristic.writeValue(
-                        new TextEncoder().encode(JSON.stringify(answer))
-                    );
-                }
-                if (data.type === 'answer') {
-                    await handleAnswer(data);
-                }
-            } catch (e) { console.error('Bluetooth message error:', e); }
-        }
-
-        // Modified WebRTC functions to support new modes
-        async function startSharing() {
-            // Modified to generate QR code for BarkCode
-            if (currentMode === 'barkcode') {
-                generateQR(JSON.stringify(peerConnection.localDescription));
-            }
-            // Original WebRTC logic
-        }
-
-        // Add Bluetooth handlers to existing WebRTC logic
-        function setupDataChannel(channel) {
-            channel.onopen = () => {
-                if (currentMode === 'taillink') {
-                    document.getElementById('bluetoothStatus').innerHTML += '<br>Data channel ready!';
-                }
-                sendNextFile();
             };
+            
+            airConnection.onicecandidate = e => {
+                if (e.candidate) {
+                    // Simulate proximity discovery
+                    if (typeof discoverPeer === 'function') {
+                        discoverPeer(JSON.stringify(airConnection.localDescription));
+                    }
+                }
+            };
+            
+            const offer = await airConnection.createOffer();
+            await airConnection.setLocalDescription(offer);
+        }
+
+        async function discoverDevices() {
+            airConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            
+            airConnection.ondatachannel = e => {
+                const channel = e.channel;
+                let currentFile = null;
+                let receivedSize = 0;
+                
+                channel.onmessage = async event => {
+                    if (typeof event.data === 'string') {
+                        const meta = JSON.parse(event.data);
+                        currentFile = {
+                            name: meta.name,
+                            type: meta.type,
+                            size: meta.size,
+                            data: []
+                        };
+                        receivedSize = 0;
+                    } else {
+                        currentFile.data.push(event.data);
+                        receivedSize += event.data.byteLength;
+                        
+                        document.getElementById('receiveProgress').style.width = 
+                            `${(receivedSize / currentFile.size) * 100}%`;
+                        
+                        if (receivedSize === currentFile.size) {
+                            const file = new Blob(currentFile.data, { type: currentFile.type });
+                            downloadFile(file, currentFile.name);
+                        }
+                    }
+                };
+            };
+            
+            // Simulated proximity discovery
+            const offer = await new Promise(resolve => {
+                discoverPeer = resolve;
+            });
+            
+            await airConnection.setRemoteDescription(JSON.parse(offer));
+            const answer = await airConnection.createAnswer();
+            await airConnection.setLocalDescription(answer);
+        }
+
+        // Helper functions
+        function arrayBufferToBase64(buffer) {
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function downloadFile(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function formatSize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return `${size.toFixed(2)} ${units[unitIndex]}`;
         }
     </script>
 </body>
